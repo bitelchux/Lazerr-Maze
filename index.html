@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Lazerr Maze - RacoonJS</title>
+		<meta charset="utf-8" />
+		<script src="racoon.js"></script>
+		<script src="lazer.js"></script>
+		<style>
+			body {
+				margin: 0px;
+			}
+			
+			canvas {
+				position: absolute;
+				left: calc(50% - 320px);
+				top: calc(50% - 240px);
+			}
+		</style>
+	</head>
+	<body>
+		<canvas id="c"></canvas>
+		<script type="text/javascript">
+			// Levels
+			var levels = [
+				{ // 0
+					emptyCells: [],
+					mirrors: [],
+					endPoint: vec2(4,4),
+					lazer: {
+						pos: vec2(0,0),
+						dir: vec2(0,1),
+					},
+					target: [1,3],
+					color: "#f00",
+				},{ // 1
+					emptyCells: [0,0,1,0,0,1,9,9,0,9,9,0,6,7,6,6,7,6,5,1,9,6,6,9,5,2,7,3],
+					mirrors: [vec2(1,6),vec2(9,1)],
+					endPoint: vec2(8,7),
+					lazer: {
+						pos: vec2(2,2),
+						dir: vec2(1,-1),
+					},
+					target: [3,4],
+					color: "#0f0",
+				},{ // 2
+					emptyCells: [3,2,3,3,1,3,6,6,7,7,5,9,9,6],
+					mirrors: [vec2(5,8),vec2(0,5)],
+					endPoint: vec2(8,7),
+					lazer: {
+						pos: vec2(2,2),
+						dir: vec2(0,1),
+					},
+					target: [7,11],
+					color: "#00f",
+				},{ // 3
+					emptyCells: [6,4,6,5,6,6,4,6,5,6,7,0,7,2,7,3,5,3,1,2,9,4,2,7],
+					mirrors: [vec2(9,1),vec2(4,9)],
+					endPoint: vec2(9,9),
+					lazer: {
+						pos: vec2(3,4),
+						dir: vec2(-2,-1),
+					},
+					target: [2,7],
+					color: "#0ff",
+				},{ // 4
+					emptyCells: [4,3,4,5,5,5,6,5,6,4,6,3,5,3,0,6,1,6,2,6,3,6,4,6,7,3,5,1,5,2,3,3,4,9,5,9],
+					mirrors: [vec2(9,9),vec2(9,2),vec2(5,0),vec2(0,5)],
+					endPoint: vec2(5,4),
+					lazer: {
+						pos: vec2(0,9),
+						dir: vec2(0,1),
+					},
+					target: [8,14],
+					color: "#f0f",
+				},{ // 5
+					emptyCells: [3,0,3,1,3,2,3,3,0,4,2,9,7,9,9,7,6,4,5,2,7,3,0,5,5,6,5,1,9,2,1,6,8,2],
+					mirrors: [vec2(4,4),vec2(1,8)],
+					endPoint: vec2(9,4),
+					lazer: {
+						pos: vec2(1,1),
+						dir: vec2(0,1),
+					},
+					target: [8,15],
+					color: "#ff0",
+				},{ // 6
+					emptyCells: [2,2,0,4,3,4,3,5,4,5,3,0,8,6],
+					mirrors: [vec2(1,9)],
+					endPoint: vec2(4,4),
+					lazer: {
+						pos: vec2(0,0),
+						dir: vec2(0,1),
+					},
+					target: [3,5],
+					color: "#f00",
+				},{ // 7
+					emptyCells: [5,0,1,1,8,8,1,8,8,1,4,7,4,1,9,3,4,4,9,5,4,3],
+					mirrors: [vec2(8,7),vec2(0,3)],
+					endPoint: vec2(9,0),
+					lazer: {
+						pos: vec2(1,0),
+						dir: vec2(0,1),
+					},
+					target: [5,8],
+					color: "#0f0",
+				}
+			];
+			
+			if (!localStorage.levels || JSON.parse("["+localStorage.levels+"]").length != levels.length) {
+				var arr = [];
+				for (var i = 0; i < levels.length; i++) {
+					arr[i] = 0;
+				}
+				
+				localStorage.levels = arr;
+			}
+			
+			var Game = new RJ.Game();
+			(function() {
+				var level = 1;
+				
+				// Images
+				var logo = new Image();
+				logo.src = "./img/lazerrmaze.png";
+				
+				var screens = new Image();
+				screens.src = "./img/screenshots.png";
+				
+				// Initialization
+				var win = null;
+				Game.init({
+					canvas:"c",
+					size: size(640,480)
+				});
+				win = Game.winSize();
+				var center = size2vec(win).div(2)
+				var MenuScene, GameScene, HowToScene, LevelScene;
+				
+				LevelScene = new RJ.Scene({
+					name: "LevelScene",
+					update: function () {
+						if (this.opacity < 1) {
+							this.opacity += 1/120;
+						}
+						else if (this.opacity != 1) {
+							this.opacity = 1;
+						}
+					},
+					enter: function () {
+						this.opacity = 0;
+						
+						var Logo = new RJ.Image({
+							name: "Logo",
+							image: logo,
+							pos: vec2(32,32),
+							size: size(448,128),
+							clip: new RJ.Rect(0,0,448,128),
+						});
+						
+						var LevelPicker = new LZ.LevelSelect({
+							name: "LevelSelect",
+							levels: levels,
+							callback: function (i) {
+								level = i;
+								
+								LevelScene.removeFromParent();
+								Game.addChild(GameScene);
+							},
+						});
+						
+						var Back = new LZ.Button({
+							name: "Back",
+							pos: vec2(16,432),
+							size: size(128,32),
+							callback: function () {
+								LevelScene.removeFromParent();
+								Game.addChild(MenuScene);
+							},
+							image: new RJ.Image({
+								nameless: true,
+								image: logo,
+								size: size(128,32),
+								clip: new RJ.Rect(0,128,128,32),
+							}),
+						});
+						
+						this.addChild(LevelPicker);
+						this.addChild(Logo);
+						this.addChild(Back);
+					},
+				});
+				
+				GameScene = new RJ.Scene({
+					name: "GameScene",
+					exit: function () {
+						this.removeAllChildren();
+					},
+					enter: function () {
+						this.sTime = new Date().getTime();
+						
+						var tile = new LZ.Tile({
+							name: "Floor",
+							pos: center.clone().sub(vec2(200,200)),
+							size: size(400,400),
+							fillColor: "#001",
+							strokeColor: "#067",
+							width: 10,
+							height: 10,
+							tileSize: size(40,40),
+							emptyCells: levels[level].emptyCells,
+						});
+						
+						var mirrors = new LZ.Mirrors({
+							name: "Mirrors",
+							fillColor: "#ddd",
+							strokeColor: "#999",
+							mirrors: levels[level].mirrors,
+							color: levels[level].color,
+						});
+						
+						var lDetectorPos = levels[level].endPoint.clone().scalar(40).add(vec2(20,20)).add(vec2(120,40))
+						var lDetector = new LZ.LzDetector({
+							name: "Detector",
+							pos: lDetectorPos,
+							size: size(20,20),
+							anchor: vec2(0.5,0.5),
+							fillColor: "#fff",
+							strokeColor: "#666",
+							alpha: 0.75,
+							lineWidth: 4,
+						});
+						
+						var status = new RJ.GameObject({
+							name: "Status",
+							update: function () {
+								if (this.opacity < 1) {
+									this.opacity += 1/60;
+								}
+								else if (this.opacity != 1) {
+									this.opacity = 1;
+								}
+							},
+							enter: function () {
+								this.opacity = 0;
+								
+								this.levls = JSON.parse("["+localStorage.levels+"]");
+								
+								if (level < levels.length-1) {
+									var Back = new LZ.Button({
+										name: "Next",
+										pos: vec2(445,380),
+										anchor: vec2(1,0),
+										size: size(110,40),
+										callback: function () {
+											GameScene.removeFromParent();
+											level++;
+											Game.addChild(GameScene);
+										},
+										image: new RJ.GameObject({
+											nameless: true,
+											size: size(110,40),
+											render: function (ctx) {
+												ctx.fillStyle = "#023";
+												ctx.strokeStyle = "#012";
+												ctx.lineWidth = 4;
+										
+												ctx.fillRect(0,0,this.rect.w,this.rect.h);
+												ctx.strokeRect(0,0,this.rect.w,this.rect.h);
+										
+												ctx.font = "16px Arial";
+												ctx.fillStyle = "#fff";
+												ctx.textAlign = "center";
+												ctx.textBaseline = "middle";
+										
+												ctx.fillText("Next",55,20)
+											},
+										}),
+									});
+							
+									this.addChild(Back);
+								}
+								
+								var Back = new LZ.Button({
+									name: "Back",
+									pos: vec2(195,380),
+									anchor: vec2(0,0),
+									size: size(110,40),
+									callback: function () {
+										GameScene.removeFromParent();
+										Game.addChild(LevelScene);
+									},
+									image: new RJ.GameObject({
+										nameless: true,
+										size: size(110,40),
+										render: function (ctx) {
+											ctx.fillStyle = "#023";
+											ctx.strokeStyle = "#012";
+											ctx.lineWidth = 4;
+											
+											ctx.fillRect(0,0,this.rect.w,this.rect.h);
+											ctx.strokeRect(0,0,this.rect.w,this.rect.h);
+											
+											ctx.font = "16px Arial";
+											ctx.fillStyle = "#fff";
+											ctx.textAlign = "center";
+											ctx.textBaseline = "middle";
+											
+											ctx.fillText("Back",55,20)
+										},
+									}),
+								});
+								
+								this.addChild(Back);
+							},
+							render: function (ctx) {
+								ctx.globalAlpha = 0.5;
+								ctx.fillStyle = "#000";
+								ctx.fillRect(0,0,640,480);
+								ctx.globalAlpha = this.opacity;
+								
+								ctx.strokeStyle = "#023";
+								ctx.fillStyle = "#034";
+								
+								ctx.fillRect(160,40,320,400);
+								ctx.strokeRect(160,40,320,400);
+								
+								ctx.fillStyle = "#fff";
+								ctx.font = "32px Arial";
+								ctx.textAlign = "center";
+								ctx.textBaseline = "top";
+								ctx.fillText("LEVEL COMPLETE!",320,80);
+								
+								var levls = this.levls;
+								var score = levls[level];
+								
+								ctx.font = "24px Arial";
+								ctx.fillText("You gained "+score+" bars:",320,160)
+								
+								var h = score;
+								for (var d = 0; d < 3; d++) {
+									var x = 320;
+									var y = 240-35;
+									if (h > 0) {
+										ctx.fillStyle = "#045";
+										ctx.fillRect(x - 125 + d * 100,y,50,70);
+						
+										h--;
+									}
+									else {
+										ctx.fillStyle = "#067";
+										ctx.fillRect(x - 125 + d * 100,y,50,70);
+										ctx.fillStyle = "#045";
+										ctx.fillRect(x - 125 + d * 100,y+40,50,30);
+									}
+									ctx.lineWidth = 4;
+									ctx.strokeRect(x - 125 + d * 100,y,50,70);
+								}
+							},
+							size: win,
+							strokeColor: "#023",
+							fillColor: "#034",
+							pos: vecNull(),
+						});
+						
+						var lazer = new LZ.Lazer({
+							name: "Laser",
+							dir: levels[level].lazer.dir.clone(),
+							org: levels[level].lazer.pos.clone().scalar(40).add(vec2(20,20)).add(vec2(120,40)),
+							tiles: tile,
+							mirrors: mirrors,
+							detector: lDetector,
+							strokeColor: levels[level].color,
+							callback: function (lazers) {
+								if (lazer.timer == null) {
+									lazer.running = false;
+									
+									var levls = JSON.parse("["+localStorage.levels+"]");
+									var score = levls[level];
+									var targets = levels[level].target;
+									
+									if (lazers <= targets[0] && score < 3) {
+										score = 3;
+									}
+									else if (lazers < targets[1] && score < 2) {
+										score = 2;
+									}
+									else if (score < 1) {
+										score = 1;
+									}
+									
+									levls[level] = score;
+									localStorage.levels = levls;
+									console.log(localStorage.levels);
+									
+									// lazer.timer = setTimeout(function () {
+// 										GameScene.removeFromParent();
+// 										GameScene.opacity = 0;
+// 										Game.addChild(MenuScene);
+// 										
+// 										lazer.timer = null;
+// 									},1000);
+
+									console.log(lazers);
+									GameScene.addChild(status);
+								}
+							},
+						});
+						mirrors.lazer = lazer;
+						
+						this.addChild(tile);
+						this.addChild(lazer);
+						this.addChild(mirrors);
+						this.addChild(lDetector);
+					},
+					update: function () {
+						if (this.opacity < 1) {
+							this.opacity += 1/120;
+						}
+						else if (this.opacity != 1) {
+							this.opacity = 1;
+						}
+					},
+				});
+				GameScene.opacity = 0;
+				
+				HowToScene = new RJ.Scene({
+					name: "HowToScene",
+					update: function () {
+						if (this.opacity < 1) {
+							this.opacity += 1/120;
+						}
+						else if (this.opacity != 1) {
+							this.opacity = 1;
+						}
+					},
+					enter: function () {
+						this.opacity = 0;
+						
+						var Back = new LZ.Button({
+							name: "Back",
+							pos: vec2(16,432),
+							size: size(128,32),
+							callback: function () {
+								HowToScene.removeFromParent();
+								Game.addChild(MenuScene);
+							},
+							image: new RJ.Image({
+								nameless: true,
+								image: logo,
+								size: size(128,32),
+								clip: new RJ.Rect(0,128,128,32),
+							}),
+						});
+						
+						var HowToTitle = new RJ.Image({
+							nameless: true,
+							image: logo,
+							pos: vec2(16,16),
+							size: size(320,32),
+							clip: new RJ.Rect(0,160,320,32),
+						});
+						
+						var HowTo = new LZ.HowTo({
+							name: "HowTo",
+							image: screens,
+						});
+						
+						this.addChild(HowToTitle);
+						this.addChild(HowTo);
+						this.addChild(Back);
+					},
+				});
+				
+				MenuScene = new RJ.Scene({
+					name: "MenuScene",
+					update: function () {
+						if (this.opacity < 1) {
+							this.opacity += 1/120;
+						}
+						else if (this.opacity != 1) {
+							this.opacity = 1;
+						}
+					},
+					enter: function () {
+						this.opacity = 0;
+						
+						var Logo = new RJ.Image({
+							name: "Logo",
+							image: logo,
+							pos: vec2(32,32),
+							size: size(448,128),
+							clip: new RJ.Rect(0,0,448,128),
+						});
+						
+						var Start = new LZ.Button({
+							name: "Start",
+							pos: vec2(64,224),
+							size: size(160,32),
+							callback: function () {
+								MenuScene.removeFromParent();
+								Game.addChild(LevelScene);
+							},
+							image: new RJ.Image({
+								nameless: true,
+								image: logo,
+								size: size(160,32),
+								clip: new RJ.Rect(0,192,160,32),
+							}),
+						});
+						
+						var HowTo = new LZ.Button({
+							name: "HowTo",
+							pos: vec2(576,288),
+							size: size(172,32),
+							anchor: vec2(1,0),
+							callback: function () {
+								MenuScene.removeFromParent();
+								Game.addChild(HowToScene);
+							},
+							image: new RJ.Image({
+								nameless: true,
+								image: logo,
+								size: size(172,32),
+								clip: new RJ.Rect(0,160,172,32),
+							}),
+						});
+						
+						var About = new LZ.Button({
+							name: "About",
+							pos: vec2(64,352),
+							size: size(160,32),
+							callback: function () {
+								alert("Made by Volter9\nPowered by RacoonJS v1.2 (Slightly Edited)")
+							},
+							image: new RJ.Image({
+								nameless: true,
+								image: logo,
+								size: size(160,32),
+								clip: new RJ.Rect(0,224,160,32),
+							}),
+						});
+						
+						this.addChild(Logo);
+						this.addChild(HowTo);
+ 						this.addChild(Start);
+ 						this.addChild(About);
+					},
+				});
+				
+				var bg = RJ.RadialGradient(Game,new RJ.Circle(center.clone(),25),new RJ.Circle(center.clone(),320),[0,"#046",1,"#001"]);
+				Game.setBackground(bg);
+				Game.addChild(MenuScene);
+				
+				//Game.showFPS();
+				//Game.turnOnDebug();
+			})();
+		</script>
+	</body>
+</html>
